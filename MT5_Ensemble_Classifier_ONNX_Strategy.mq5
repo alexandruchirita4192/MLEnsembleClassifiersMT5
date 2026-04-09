@@ -1,7 +1,7 @@
 #property strict
 #property version   "1.10"
 #property description "EA MT5: Weighted Ensemble ONNX (MLP + LightGBM + HGB)"
-#property description "Weight-urile pot muta complet semnalul pe un singur model"
+#property description "Weights can completely shift the signal to a single model"
 
 #include <Trade/Trade.mqh>
 

@@ -62,13 +62,13 @@ def normalize_weights(mlp_weight: float, lgbm_weight: float, hgb_weight: float) 
     }
     s = raw["mlp"] + raw["lgbm"] + raw["hgb"]
     if s <= 0.0:
-        raise ValueError("Cel putin un weight trebuie sa fie > 0.")
+        raise ValueError("At least one weight needs to be greater than 0.")
     return {k: v / s for k, v in raw.items()}
 
 
 def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.DataFrame:
     if mt5 is None:
-        raise RuntimeError("Pachetul MetaTrader5 pentru Python nu este instalat. Instaleaza-l cu: pip install MetaTrader5")
+        raise RuntimeError("The MetaTrader5 package for Python is not installed. Install it with: pip install MetaTrader5")
 
     timeframe_map = {
         "M1": mt5.TIMEFRAME_M1,
@@ -80,15 +80,15 @@ def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.Data
         "D1": mt5.TIMEFRAME_D1,
     }
     if timeframe_name not in timeframe_map:
-        raise ValueError(f"Timeframe nesuportat: {timeframe_name}")
+        raise ValueError(f"Unsupported timeframe: {timeframe_name}")
 
     if not mt5.initialize():
-        raise RuntimeError(f"initialize() a esuat: {mt5.last_error()}")
+        raise RuntimeError(f"initialize() failed: {mt5.last_error()}")
 
     try:
         rates = mt5.copy_rates_from_pos(symbol, timeframe_map[timeframe_name], 0, bars)
         if rates is None or len(rates) == 0:
-            raise RuntimeError(f"Nu am putut citi datele pentru {symbol} {timeframe_name}. last_error={mt5.last_error()}")
+            raise RuntimeError(f"Could not read data for {symbol} {timeframe_name}. last_error={mt5.last_error()}")
         df = pd.DataFrame(rates)
         df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
         df = df.rename(columns={"tick_volume": "volume"})
@@ -104,7 +104,7 @@ def load_rates_from_csv(csv_path: Path) -> pd.DataFrame:
     expected = {"time", "open", "high", "low", "close"}
     missing = expected - set(df.columns)
     if missing:
-        raise ValueError(f"CSV-ul nu contine coloanele obligatorii: {sorted(missing)}")
+        raise ValueError(f"CSV does not contain mandatory columns: {sorted(missing)}")
 
     if "volume" not in df.columns:
         df["volume"] = 0.0
@@ -150,7 +150,7 @@ def split_train_test(df: pd.DataFrame, train_ratio: float) -> Tuple[pd.DataFrame
     train_df = df.iloc[:split_idx].copy()
     test_df = df.iloc[split_idx:].copy()
     if len(train_df) < 1500 or len(test_df) < 250:
-        raise ValueError("Prea putine exemple dupa split.")
+        raise ValueError("Too few examples after split.")
     return train_df, test_df
 
 
@@ -467,9 +467,9 @@ def save_metadata(output_dir: Path, args: argparse.Namespace, weights: Dict[str,
 def write_run_in_mt5(output_dir: Path, args: argparse.Namespace, weights: Dict[str, float], train_start: str, train_end: str, test_start: str, test_end: str,
                      entry_prob_threshold: float, min_prob_gap: float) -> None:
     txt = f"""MODEL: WeightedEnsemble(MLP + LightGBM + HGB)
-SIMBOL: {args.symbol}
+SYMBOL: {args.symbol}
 TIMEFRAME: {args.timeframe}
-ORIZONT TARGET (bare): {args.horizon_bars}
+HORIZON TARGET (bars): {args.horizon_bars}
 
 TRAIN UTC:
   start: {train_start}
@@ -479,26 +479,26 @@ TEST UTC:
   start: {test_start}
   end  : {test_end}
 
-WEIGHTS NORMALIZATE:
+WEIGHTS NORMALIZED:
   InpMlpWeight  = {weights['mlp']:.6f}
   InpLgbmWeight = {weights['lgbm']:.6f}
   InpHgbWeight  = {weights['hgb']:.6f}
 
-INPUTURI RECOMANDATE PENTRU EA:
+RECOMMENDED INPUTS FOR EA:
   InpEntryProbThreshold = {entry_prob_threshold:.6f}
   InpMinProbGap        = {min_prob_gap:.6f}
   InpMaxBarsInTrade    = {args.horizon_bars}
 
-NOTA:
-- Daca pui InpMlpWeight=1 si restul 0, ensemble-ul devine practic MLP-only.
-- Daca pui InpLgbmWeight=1 si restul 0, devine LightGBM-only.
-- Daca pui InpHgbWeight=1 si restul 0, devine HGB-only.
+NOTES:
+- If you put InpMlpWeight=1 and the rest 0, ensemble is MLP-only.
+- If you put InpLgbmWeight=1 and the rest 0, ensemble is LightGBM-only.
+- If you put InpHgbWeight=1 and the rest 0, ensemble is HGB-only.
 """
     (output_dir / "run_in_mt5.txt").write_text(txt, encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Antreneaza un ensemble cu weight-uri configurabile: MLP + LightGBM + HGB.")
+    p = argparse.ArgumentParser(description="Train an ensemble with configurable weights: MLP + LightGBM + HGB.")
     p.add_argument("--symbol", default="XAGUSD")
     p.add_argument("--timeframe", default="M15")
     p.add_argument("--bars", type=int, default=20000)
@@ -529,11 +529,11 @@ def main() -> None:
     feat_df = build_features(raw, args.horizon_bars)
     feat_df.to_csv(output_dir / "all_features_snapshot.csv", index=False)
 
-    print(f"Set total cu features: {len(feat_df)} randuri")
-    print(f"Weights normalizate: MLP={weights['mlp']:.4f} LGBM={weights['lgbm']:.4f} HGB={weights['hgb']:.4f}")
+    print(f"Total set with features: {len(feat_df)} rows")
+    print(f"Normalized weights: MLP={weights['mlp']:.4f} LGBM={weights['lgbm']:.4f} HGB={weights['hgb']:.4f}")
 
     train_df, test_df = split_train_test(feat_df, args.train_ratio)
-    print(f"Train: {len(train_df)} randuri | Test: {len(test_df)} randuri")
+    print(f"Train: {len(train_df)} rows | Test: {len(test_df)} rows")
     print(f"Train window: {train_df['time'].iloc[0]} -> {train_df['time'].iloc[-1]}")
     print(f"Test window : {test_df['time'].iloc[0]} -> {test_df['time'].iloc[-1]}")
     print()
@@ -541,7 +541,7 @@ def main() -> None:
     walk_forward = walk_forward_report(
         train_df, weights, args.walk_forward_splits, args.label_quantile, args.prob_quantile, args.margin_quantile
     )
-    print("\nRezumat walk-forward pe train:")
+    print("\nSummary walk-forward on train:")
     print(json.dumps(walk_forward, indent=2))
 
     barrier = compute_return_barrier(train_df, args.label_quantile)
@@ -564,9 +564,9 @@ def main() -> None:
     train_summary = summarize_predictions(train_pred)
     test_summary = summarize_predictions(test_pred)
 
-    print(f"\nBariera de etichetare abs(fwd_ret_h): {barrier:.8f}")
-    print(f"Prag probabilitate intrare derivat din predictii train: {entry_prob_threshold:.6f}")
-    print(f"Prag diferenta probabilitati derivat din predictii train: {min_prob_gap:.6f}")
+    print(f"\nLabel barrier abs(fwd_ret_h): {barrier:.8f}")
+    print(f"Entry probability threshold derived from train predictions: {entry_prob_threshold:.6f}")
+    print(f"Minimum probability gap derived from train predictions: {min_prob_gap:.6f}")
 
     print("\nTrain summary:")
     print(json.dumps(train_summary, indent=2))
@@ -591,7 +591,7 @@ def main() -> None:
         entry_prob_threshold, min_prob_gap,
     )
 
-    print(f"\nModele ONNX salvate in: {output_dir}")
+    print(f"\nONNX models saved in: {output_dir}")
     print("  - mlp.onnx")
     print("  - lightgbm.onnx")
     print("  - hgb.onnx")

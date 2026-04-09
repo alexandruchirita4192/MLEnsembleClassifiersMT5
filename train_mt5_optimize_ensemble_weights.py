@@ -58,7 +58,7 @@ def _coerce_bool_attributes_for_onnx():
 
 def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.DataFrame:
     if mt5 is None:
-        raise RuntimeError("Pachetul MetaTrader5 pentru Python nu este instalat. Instaleaza-l cu: pip install MetaTrader5")
+        raise RuntimeError("The MetaTrader5 package for Python is not installed. Install it with: pip install MetaTrader5")
 
     timeframe_map = {
         "M1": mt5.TIMEFRAME_M1,
@@ -70,15 +70,15 @@ def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.Data
         "D1": mt5.TIMEFRAME_D1,
     }
     if timeframe_name not in timeframe_map:
-        raise ValueError(f"Timeframe nesuportat: {timeframe_name}")
+        raise ValueError(f"Unsupported timeframe: {timeframe_name}")
 
     if not mt5.initialize():
-        raise RuntimeError(f"initialize() a esuat: {mt5.last_error()}")
+        raise RuntimeError(f"initialize() failed: {mt5.last_error()}")
 
     try:
         rates = mt5.copy_rates_from_pos(symbol, timeframe_map[timeframe_name], 0, bars)
         if rates is None or len(rates) == 0:
-            raise RuntimeError(f"Nu am putut citi datele pentru {symbol} {timeframe_name}. last_error={mt5.last_error()}")
+            raise RuntimeError(f"Could not read data for {symbol} {timeframe_name}. last_error={mt5.last_error()}")
         df = pd.DataFrame(rates)
         df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
         df = df.rename(columns={"tick_volume": "volume"})
@@ -94,7 +94,7 @@ def load_rates_from_csv(csv_path: Path) -> pd.DataFrame:
     expected = {"time", "open", "high", "low", "close"}
     missing = expected - set(df.columns)
     if missing:
-        raise ValueError(f"CSV-ul nu contine coloanele obligatorii: {sorted(missing)}")
+        raise ValueError(f"CSV does not contain mandatory columns: {sorted(missing)}")
 
     if "volume" not in df.columns:
         df["volume"] = 0.0
@@ -140,7 +140,7 @@ def split_train_test(df: pd.DataFrame, train_ratio: float) -> Tuple[pd.DataFrame
     train_df = df.iloc[:split_idx].copy()
     test_df = df.iloc[split_idx:].copy()
     if len(train_df) < 1500 or len(test_df) < 250:
-        raise ValueError("Prea putine exemple dupa split.")
+        raise ValueError("Too few examples after split.")
     return train_df, test_df
 
 
@@ -229,7 +229,7 @@ def normalize_weights(mlp_weight: float, lgbm_weight: float, hgb_weight: float) 
     }
     s = raw["mlp"] + raw["lgbm"] + raw["hgb"]
     if s <= 0.0:
-        raise ValueError("Cel putin un weight trebuie sa fie > 0.")
+        raise ValueError("At least one weight needs to be greater than 0.")
     return {k: v / s for k, v in raw.items()}
 
 
@@ -388,17 +388,16 @@ def objective_score(summary: Dict[str, float], score_mode: str) -> float:
         mean_term = mean_ret * 1000.0
         return (0.45 * pf_term) + (0.25 * precision) + (0.15 * bal_acc) + (0.10 * accepted) + (0.05 * mean_term)
 
-    raise ValueError(f"score_mode necunoscut: {score_mode}")
+    raise ValueError(f"score_mode unknown: {score_mode}")
 
 
 def generate_weight_candidates(step: float, allow_zero: bool) -> List[Dict[str, float]]:
     if step <= 0 or step > 1:
-        raise ValueError("--weight-step trebuie sa fie in intervalul (0, 1].")
+        raise ValueError("--weight-step must be in the interval (0, 1].")
 
     units = int(round(1.0 / step))
     if abs((units * step) - 1.0) > 1e-9:
-        raise ValueError("--weight-step trebuie sa imparta exact 1. Exemple bune: 0.05, 0.1, 0.2, 0.25")
-
+        raise ValueError("--weight-step must divide 1 exactly. Good examples: 0.05, 0.1, 0.2, 0.25")
     candidates: List[Dict[str, float]] = []
     start = 0 if allow_zero else 1
     for a in range(start, units + 1):
@@ -510,7 +509,7 @@ def export_model_to_onnx(model, output_path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Optimizeaza automat weight-urile pentru ensemble MLP + LightGBM + HGB.")
+    p = argparse.ArgumentParser(description="Automatically optimize weights for MLP + LightGBM + HGB ensemble.")
     p.add_argument("--symbol", default="XAGUSD")
     p.add_argument("--timeframe", default="M15")
     p.add_argument("--bars", type=int, default=20000)
@@ -540,15 +539,15 @@ def main() -> None:
     feat_df = build_features(raw, args.horizon_bars)
     feat_df.to_csv(output_dir / "all_features_snapshot.csv", index=False)
 
-    print(f"Set total cu features: {len(feat_df)} randuri")
+    print(f"Total set with features: {len(feat_df)} rows")
     train_df, test_df = split_train_test(feat_df, args.train_ratio)
-    print(f"Train: {len(train_df)} randuri | Test: {len(test_df)} randuri")
+    print(f"Train: {len(train_df)} rows | Test: {len(test_df)} rows")
     print(f"Train window: {train_df['time'].iloc[0]} -> {train_df['time'].iloc[-1]}")
-    print(f"Test window : {test_df['time'].iloc[0]} -> {test_df['time'].iloc[-1]}")
+    print(f"Test window: {test_df['time'].iloc[0]} -> {test_df['time'].iloc[-1]}")
 
     weight_candidates = generate_weight_candidates(args.weight_step, args.allow_zero_weights)
-    print(f"Numar combinatii weight-uri testate per fold: {len(weight_candidates)}")
-    print(f"Scor optimizat: {args.score_mode}")
+    print(f"Number of weight combinations tested per fold: {len(weight_candidates)}")
+    print(f"Optimized score: {args.score_mode}")
     print()
 
     fold_results, best_avg_weights = walk_forward_optimize_weights(
@@ -561,7 +560,7 @@ def main() -> None:
         score_mode=args.score_mode,
     )
 
-    print("\nWeight-uri medii optime din walk-forward:")
+    print("\nAverage optimal weights from walk-forward:")
     print(json.dumps(best_avg_weights, indent=2))
 
     barrier = compute_return_barrier(train_df, args.label_quantile)
@@ -579,9 +578,9 @@ def main() -> None:
     train_summary = summarize_predictions(train_pred)
     test_summary = summarize_predictions(test_pred)
 
-    print(f"\nBariera de etichetare abs(fwd_ret_h): {barrier:.8f}")
-    print(f"Prag probabilitate intrare derivat din predictii train: {entry_prob_threshold:.6f}")
-    print(f"Prag diferenta probabilitati derivat din predictii train: {min_prob_gap:.6f}")
+    print(f"\nReturn barrier for labeling abs(fwd_ret_h): {barrier:.8f}")
+    print(f"Entry probability threshold derived from train predictions: {entry_prob_threshold:.6f}")
+    print(f"Minimum probability gap derived from train predictions: {min_prob_gap:.6f}")
 
     print("\nTrain summary:")
     print(json.dumps(train_summary, indent=2))
@@ -640,38 +639,38 @@ def main() -> None:
     }
     (output_dir / "weight_search_metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-    run_txt = f"""MODEL: WeightedEnsemble(MLP + LightGBM + HGB) cu weight-uri optimizate automat
-SIMBOL: {args.symbol}
+    run_txt = f"""MODEL: WeightedEnsemble(MLP + LightGBM + HGB) with automatically optimized weights from walk-forward validation.
+SYMBOL: {args.symbol}
 TIMEFRAME: {args.timeframe}
-ORIZONT TARGET (bare): {args.horizon_bars}
+HORIZON TARGET (bars): {args.horizon_bars}
 
 BEST WEIGHTS:
   InpMlpWeight  = {best_avg_weights['mlp']:.6f}
   InpLgbmWeight = {best_avg_weights['lgbm']:.6f}
   InpHgbWeight  = {best_avg_weights['hgb']:.6f}
 
-INPUTURI RECOMANDATE:
+RECOMMENDED INPUTS FOR MT5:
   InpEntryProbThreshold = {entry_prob_threshold:.6f}
   InpMinProbGap        = {min_prob_gap:.6f}
   InpMaxBarsInTrade    = {args.horizon_bars}
 
-FISIERE ONNX:
+ONNX FILES GENERATED (to be used in MT5):
   - mlp.onnx
   - lightgbm.onnx
   - hgb.onnx
 
-OBS:
-- Weight-urile de mai sus sunt media celor mai bune combinatii pe fold-urile walk-forward.
-- Daca vrei coarse search mai rapid: --weight-step 0.2
-- Daca vrei search mai fin: --weight-step 0.05
+NOTES:
+- The weights above are the average of the best combinations on the walk-forward folds.
+- If you want faster coarse search: --weight-step 0.2
+- If you want finer search: --weight-step 0.05
 """
     (output_dir / "run_in_mt5.txt").write_text(run_txt, encoding="utf-8")
 
-    print(f"\nModele ONNX salvate in: {output_dir}")
+    print(f"\nONNX models saved in: {output_dir}")
     print("  - mlp.onnx")
     print("  - lightgbm.onnx")
     print("  - hgb.onnx")
-    print("Fisier util pentru MT5: run_in_mt5.txt")
+    print("Useful file for MT5: run_in_mt5.txt")
 
 
 if __name__ == "__main__":
