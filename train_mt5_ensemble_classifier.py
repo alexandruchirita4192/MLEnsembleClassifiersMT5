@@ -18,6 +18,7 @@ from sklearn.preprocessing import StandardScaler
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType as SklFloatTensorType
 from onnxmltools.convert.common.data_types import FloatTensorType as OnnxToolsFloatTensorType
+import onnx.helper as onnx_helper
 
 try:
     import MetaTrader5 as mt5
@@ -36,6 +37,19 @@ CLASS_ORDER = [SELL_CLASS, FLAT_CLASS, BUY_CLASS]
 CLASS_TO_ENC = {SELL_CLASS: 0, FLAT_CLASS: 1, BUY_CLASS: 2}
 ENC_TO_CLASS = {v: k for k, v in CLASS_TO_ENC.items()}
 
+def _coerce_bool_attributes_for_onnx():
+    original_make_attribute = onnx_helper.make_attribute
+
+    def patched_make_attribute(key, value, *args, **kwargs):
+        if isinstance(value, (bool, np.bool_)):
+            value = int(value)
+        elif isinstance(value, (list, tuple)):
+            value = [int(v) if isinstance(v, (bool, np.bool_)) else v for v in value]
+        elif isinstance(value, np.ndarray) and value.dtype == np.bool_:
+            value = value.astype(np.int64)
+        return original_make_attribute(key, value, *args, **kwargs)
+
+    return original_make_attribute, patched_make_attribute
 
 def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.DataFrame:
     if mt5 is None:
@@ -383,6 +397,23 @@ def export_model_to_onnx(model, output_path: Path) -> None:
             target_opset=15,
             zipmap=False,
         )
+
+    elif isinstance(model, HistGradientBoostingClassifier):
+        initial_types = [("float_input", SklFloatTensorType([1, len(FEATURE_COLS)]))]
+        options = {id(model): {"zipmap": False}}
+
+        original_make_attribute, patched_make_attribute = _coerce_bool_attributes_for_onnx()
+        onnx_helper.make_attribute = patched_make_attribute
+        try:
+            onx = convert_sklearn(
+                model,
+                initial_types=initial_types,
+                options=options,
+                target_opset=15,
+            )
+        finally:
+            onnx_helper.make_attribute = original_make_attribute
+
     else:
         initial_types = [("float_input", SklFloatTensorType([1, len(FEATURE_COLS)]))]
         options = {id(model): {"zipmap": False}}
