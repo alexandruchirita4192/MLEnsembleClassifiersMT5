@@ -1,4 +1,4 @@
-# Ensemble MT5 strategy files
+# ML Ensemble MT5 strategy files
 
 ## Fisiere
 - `train_mt5_ensemble_classifier.py`
