@@ -16,7 +16,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import FloatTensorType
+from skl2onnx.common.data_types import FloatTensorType as SklFloatTensorType
+from onnxmltools.convert.common.data_types import FloatTensorType as OnnxToolsFloatTensorType
 
 try:
     import MetaTrader5 as mt5
@@ -374,14 +375,25 @@ def walk_forward_report(train_df: pd.DataFrame, n_splits: int, label_quantile: f
 
 
 def export_model_to_onnx(model, output_path: Path) -> None:
-    initial_types = [("float_input", FloatTensorType([1, len(FEATURE_COLS)]))]
     if isinstance(model, LGBMClassifier):
-        onx = convert_lightgbm(model, initial_types=initial_types, target_opset=15, zipmap=False)
+        initial_types = [("float_input", OnnxToolsFloatTensorType([1, len(FEATURE_COLS)]))]
+        onx = convert_lightgbm(
+            model,
+            initial_types=initial_types,
+            target_opset=15,
+            zipmap=False,
+        )
     else:
+        initial_types = [("float_input", SklFloatTensorType([1, len(FEATURE_COLS)]))]
         options = {id(model): {"zipmap": False}}
-        onx = convert_sklearn(model, initial_types=initial_types, options=options, target_opset=15)
-    output_path.write_bytes(onx.SerializeToString())
+        onx = convert_sklearn(
+            model,
+            initial_types=initial_types,
+            options=options,
+            target_opset=15,
+        )
 
+    output_path.write_bytes(onx.SerializeToString())
 
 def save_metadata(output_dir: Path, args: argparse.Namespace, barrier: float, walk_forward: Dict[str, float],
                   train_summary: Dict[str, float], test_summary: Dict[str, float], entry_prob_threshold: float,
