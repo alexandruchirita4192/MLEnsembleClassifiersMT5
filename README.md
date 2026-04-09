@@ -11,7 +11,7 @@ pip install MetaTrader5 pandas numpy scikit-learn lightgbm skl2onnx onnx
 
 ## Exemplu rulare
 ```powershell
-python train_mt5_ensemble_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --output-dir output_ensemble_h8
+python train_mt5_ensemble_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --output-dir output_ensemble_XAGUSD_M15_h8
 ```
 
 ## Output
