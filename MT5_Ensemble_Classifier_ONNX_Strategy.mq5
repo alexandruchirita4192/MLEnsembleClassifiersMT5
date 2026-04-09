@@ -304,6 +304,12 @@ bool TrendAllows(SignalDirection signal)
    double distance_pct=0.0;
    if(ema_1!=0.0) distance_pct=MathAbs(htf_close_1-ema_1)/ema_1;
 
+   if(InpDebugLog && InpLog)
+      PrintFormat(
+         "TREND htf_close=%.5f ema1=%.5f ema2=%.5f slope_up=%d slope_down=%d distance_pct=%.6f",
+         htf_close_1, ema_1, ema_2, slope_up, slope_down, distance_pct
+      );
+
    if(InpUseTrendDistanceFilter && distance_pct<InpTrendMinDistancePct) return false;
 
    if(signal==SIGNAL_BUY)
@@ -341,6 +347,9 @@ bool AtrVolatilityAllows(double current_atr14)
 
    double atr_min=GetPercentileFromArray(atr_values,InpAtrVolLookback,InpAtrMinPercentile);
    double atr_max=GetPercentileFromArray(atr_values,InpAtrVolLookback,InpAtrMaxPercentile);
+
+   if(InpDebugLog && InpLog)
+      PrintFormat("ATR FILTER current=%.6f min=%.6f max=%.6f", current_atr14, atr_min, atr_max);
 
    if(current_atr14<atr_min || current_atr14>atr_max) return false;
    return true;
@@ -479,13 +488,19 @@ void OpenTrade(SignalDirection signal, double atr14)
    {
       if(InpUseAtrStops){ sl=ask-sl_dist; tp=ask+tp_dist; }
       ok=trade.Buy(InpLots,_Symbol,ask,sl,tp,"Weighted Ensemble buy");
-      if(ok) g_bars_in_trade=0;
+      if(ok) { g_bars_in_trade=0; if(InpLog) Print("Buy succeeded."); }
+      else if(InpLog)
+         PrintFormat("BUY failed. retcode=%d lastError=%d ask=%.5f sl=%.5f tp=%.5f",
+                     trade.ResultRetcode(), GetLastError(), ask, sl, tp);
    }
    else if(signal==SIGNAL_SELL)
    {
       if(InpUseAtrStops){ sl=bid+sl_dist; tp=bid-tp_dist; }
       ok=trade.Sell(InpLots,_Symbol,bid,sl,tp,"Weighted Ensemble sell");
-      if(ok) g_bars_in_trade=0;
+      if(ok) { g_bars_in_trade=0; if(InpLog) Print("Sell succeeded."); }
+      else if(InpLog)
+         PrintFormat("SELL failed. retcode=%d lastError=%d bid=%.5f sl=%.5f tp=%.5f",
+                     trade.ResultRetcode(), GetLastError(), bid, sl, tp);
    }
 }
 
