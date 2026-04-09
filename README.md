@@ -24,9 +24,14 @@ Scriptul normalizeaza automat weight-urile.
 pip install MetaTrader5 pandas numpy scikit-learn lightgbm skl2onnx onnxmltools onnx
 ```
 
-## Exemplu rulare
+## Exemplu rulare invatare fara a specifica weight-urile, cautand combinatia optima de weight-uri
 ```powershell
-python train_mt5_weighted_ensemble_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --mlp-weight 1 --lgbm-weight 0 --hgb-weight 0 --output-dir output_weighted_mlp_only_h8
+python train_mt5_optimize_ensemble_weights.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --weight-step 0.2 --allow-zero-weights --output-dir output_weight_search_h8_fast
+```
+
+## Exemplu rulare invatare cu weight specificati (doar MLP conform weight-urilor puse ca exemplu)
+```powershell
+python train_mt5_weighted_ensemble_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --mlp-weight 1 --lgbm-weight 0 --hgb-weight 0 --output-dir output_weighted_mlp_only_XAGUSD_M15_h8
 ```
 
 ## Important pentru MT5
