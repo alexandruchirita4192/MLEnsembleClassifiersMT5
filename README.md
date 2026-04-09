@@ -1,37 +1,38 @@
-# ML Ensemble MT5 strategy files
+# Weighted ML ensemble classifiers for MT5
 
 ## Fisiere
-- `train_mt5_ensemble_classifier.py`
-- `MT5_Ensemble_Classifier_ONNX_Strategy.mq5`
+- `train_mt5_weighted_ensemble_classifier.py`
+- `MT5_Weighted_Ensemble_ONNX_Strategy.mq5`
+
+## Ce aduce in plus
+Poti trece din inputuri / argumente:
+- de la `MLP only`
+- la `LightGBM only`
+- la `HGB only`
+- sau la orice combinatie intermediara
+
+Exemple:
+- `MLP only`: `--mlp-weight 1 --lgbm-weight 0 --hgb-weight 0`
+- `LightGBM only`: `--mlp-weight 0 --lgbm-weight 1 --hgb-weight 0`
+- `HGB only`: `--mlp-weight 0 --lgbm-weight 0 --hgb-weight 1`
+- `Weighted`: `--mlp-weight 0.6 --lgbm-weight 0.25 --hgb-weight 0.15`
+
+Scriptul normalizeaza automat weight-urile.
 
 ## Instalare Python
 ```powershell
-pip install MetaTrader5 pandas numpy scikit-learn lightgbm skl2onnx onnx
+pip install MetaTrader5 pandas numpy scikit-learn lightgbm skl2onnx onnxmltools onnx
 ```
 
 ## Exemplu rulare
 ```powershell
-python train_mt5_ensemble_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --output-dir output_ensemble_XAGUSD_M15_h8
+python train_mt5_weighted_ensemble_classifier.py --symbol XAGUSD --timeframe M15 --bars 20000 --horizon-bars 8 --train-ratio 0.70 --mlp-weight 1 --lgbm-weight 0 --hgb-weight 0 --output-dir output_weighted_mlp_only_h8
 ```
 
-## Output
-Scriptul salveaza 3 modele ONNX:
+## Important pentru MT5
+Pune langa EA toate cele 3 fisiere:
 - `mlp.onnx`
 - `lightgbm.onnx`
 - `hgb.onnx`
 
-EA-ul face media probabilitatilor celor 3 modele.
-
-## Pasii pentru MT5
-1. Copiaza cele 3 fisiere ONNX langa `.mq5`
-2. Recompileaza EA-ul
-3. Ruleaza testerul doar pe `TEST UTC` din `run_in_mt5.txt`
-
-## Setari de start recomandate in EA
-- `InpUseTrendFilter = true`
-- `InpTrendMAPeriod = 100`
-- `InpUseTrendDistanceFilter = false`
-- `InpUseAtrVolFilter = true`
-- `InpAtrMinPercentile = 0.25`
-- `InpAtrMaxPercentile = 0.85`
-- `InpUseKillSwitch = false`
+Chiar daca folosesti un singur model, EA poate fi schimbat doar din inputuri, fara recompilare.
