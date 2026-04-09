@@ -571,6 +571,14 @@ void OnTick()
    if(!TrendAllows(raw_signal))
       filtered_signal=SIGNAL_FLAT;
 
+   if(InpDebugLog && InpLog)
+     {
+      PrintFormat(
+         "Probabilities sell=%.4f flat=%.4f buy=%.4f entry_prob=%.4f min_gap=%.4f raw_signal=%d filtered_signal=%d atr14=%.5f",
+         pSell, pFlat, pBuy, InpEntryProbThreshold, InpMinProbGap, raw_signal, filtered_signal, atr14
+      );
+     }
+
    ManageExistingPosition(filtered_signal);
 
    long pos_type;
