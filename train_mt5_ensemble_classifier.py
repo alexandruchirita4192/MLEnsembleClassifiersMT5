@@ -7,8 +7,10 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+import onnx.helper as onnx_helper
 from lightgbm import LGBMClassifier
 from onnxmltools import convert_lightgbm
+from onnxmltools.convert.common.data_types import FloatTensorType as OnnxToolsFloatTensorType
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
 from sklearn.model_selection import TimeSeriesSplit
@@ -17,8 +19,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType as SklFloatTensorType
-from onnxmltools.convert.common.data_types import FloatTensorType as OnnxToolsFloatTensorType
-import onnx.helper as onnx_helper
 
 try:
     import MetaTrader5 as mt5
@@ -26,8 +26,9 @@ except Exception:
     mt5 = None
 
 FEATURE_COLS = [
-    "ret_1", "ret_3", "ret_5", "ret_10", "vol_10",
-    "vol_20", "dist_sma_10", "dist_sma_20", "zscore_20", "atr_14",
+    "ret_1", "ret_3", "ret_5", "ret_10",
+    "vol_10", "vol_20", "dist_sma_10", "dist_sma_20",
+    "zscore_20", "atr_14",
 ]
 
 SELL_CLASS = -1
@@ -36,6 +37,7 @@ BUY_CLASS = 1
 CLASS_ORDER = [SELL_CLASS, FLAT_CLASS, BUY_CLASS]
 CLASS_TO_ENC = {SELL_CLASS: 0, FLAT_CLASS: 1, BUY_CLASS: 2}
 ENC_TO_CLASS = {v: k for k, v in CLASS_TO_ENC.items()}
+
 
 def _coerce_bool_attributes_for_onnx():
     original_make_attribute = onnx_helper.make_attribute
@@ -50,6 +52,19 @@ def _coerce_bool_attributes_for_onnx():
         return original_make_attribute(key, value, *args, **kwargs)
 
     return original_make_attribute, patched_make_attribute
+
+
+def normalize_weights(mlp_weight: float, lgbm_weight: float, hgb_weight: float) -> Dict[str, float]:
+    raw = {
+        "mlp": float(max(0.0, mlp_weight)),
+        "lgbm": float(max(0.0, lgbm_weight)),
+        "hgb": float(max(0.0, hgb_weight)),
+    }
+    s = raw["mlp"] + raw["lgbm"] + raw["hgb"]
+    if s <= 0.0:
+        raise ValueError("Cel putin un weight trebuie sa fie > 0.")
+    return {k: v / s for k, v in raw.items()}
+
 
 def fetch_rates_from_mt5(symbol: str, timeframe_name: str, bars: int) -> pd.DataFrame:
     if mt5 is None:
@@ -213,18 +228,21 @@ def fit_models(train_df: pd.DataFrame, random_state: int = 42):
     hgb = make_hgb(random_state)
     hgb.fit(X_np, y)
 
-    return mlp, lgbm, hgb
+    return {"mlp": mlp, "lgbm": lgbm, "hgb": hgb}
 
 
 def proba_to_class_map_from_classes(classes) -> Dict[int, int]:
     return {ENC_TO_CLASS[int(cls)]: idx for idx, cls in enumerate(classes)}
 
 
-def averaged_probabilities(models, X: np.ndarray) -> np.ndarray:
-    probas = []
+def weighted_probabilities(models, X: np.ndarray, weights: Dict[str, float]) -> np.ndarray:
     X_df = pd.DataFrame(X, columns=FEATURE_COLS, dtype=np.float32)
+    out = np.zeros((len(X), 3), dtype=np.float64)
 
-    for model in models:
+    for name, model in models.items():
+        if weights[name] <= 0.0:
+            continue
+
         if isinstance(model, LGBMClassifier):
             p = model.predict_proba(X_df)
             classes = model.classes_
@@ -238,14 +256,14 @@ def averaged_probabilities(models, X: np.ndarray) -> np.ndarray:
             p[:, cmap[FLAT_CLASS]],
             p[:, cmap[BUY_CLASS]],
         ])
-        probas.append(aligned)
+        out += weights[name] * aligned
 
-    return np.mean(probas, axis=0)
+    return out
 
 
-def derive_decision_thresholds(models, train_df: pd.DataFrame, prob_quantile: float, margin_quantile: float):
+def derive_decision_thresholds(models, train_df: pd.DataFrame, weights: Dict[str, float], prob_quantile: float, margin_quantile: float):
     X_train = train_df[FEATURE_COLS].to_numpy(dtype=np.float32)
-    proba = averaged_probabilities(models, X_train)
+    proba = weighted_probabilities(models, X_train, weights)
 
     p_sell = proba[:, 0]
     p_flat = proba[:, 1]
@@ -277,9 +295,9 @@ def derive_decision_thresholds(models, train_df: pd.DataFrame, prob_quantile: fl
     return entry_prob_threshold, min_prob_gap, diag
 
 
-def classify_with_thresholds(models, df: pd.DataFrame, entry_prob_threshold: float, min_prob_gap: float) -> pd.DataFrame:
+def classify_with_thresholds(models, df: pd.DataFrame, weights: Dict[str, float], entry_prob_threshold: float, min_prob_gap: float) -> pd.DataFrame:
     X = df[FEATURE_COLS].to_numpy(dtype=np.float32)
-    proba = averaged_probabilities(models, X)
+    proba = weighted_probabilities(models, X, weights)
 
     p_sell = proba[:, 0]
     p_flat = proba[:, 1]
@@ -343,7 +361,7 @@ def summarize_predictions(pred_df: pd.DataFrame) -> Dict[str, float]:
     }
 
 
-def walk_forward_report(train_df: pd.DataFrame, n_splits: int, label_quantile: float, prob_quantile: float, margin_quantile: float):
+def walk_forward_report(train_df: pd.DataFrame, weights: Dict[str, float], n_splits: int, label_quantile: float, prob_quantile: float, margin_quantile: float):
     X = train_df[FEATURE_COLS].to_numpy(dtype=np.float32)
     tscv = TimeSeriesSplit(n_splits=n_splits)
 
@@ -359,8 +377,11 @@ def walk_forward_report(train_df: pd.DataFrame, n_splits: int, label_quantile: f
         fold_valid = label_targets(fold_valid, barrier)
 
         models = fit_models(fold_train, random_state=42 + fold)
-        entry_prob_threshold, min_prob_gap, _ = derive_decision_thresholds(models, fold_train, prob_quantile, margin_quantile)
-        pred_df = classify_with_thresholds(models, fold_valid, entry_prob_threshold, min_prob_gap)
+
+        entry_prob_threshold, min_prob_gap, _ = derive_decision_thresholds(
+            models, fold_train, weights, prob_quantile, margin_quantile
+        )
+        pred_df = classify_with_thresholds(models, fold_valid, weights, entry_prob_threshold, min_prob_gap)
         summary = summarize_predictions(pred_df)
 
         accepted_rates.append(summary["accepted_rate"])
@@ -391,42 +412,25 @@ def walk_forward_report(train_df: pd.DataFrame, n_splits: int, label_quantile: f
 def export_model_to_onnx(model, output_path: Path) -> None:
     if isinstance(model, LGBMClassifier):
         initial_types = [("float_input", OnnxToolsFloatTensorType([1, len(FEATURE_COLS)]))]
-        onx = convert_lightgbm(
-            model,
-            initial_types=initial_types,
-            target_opset=15,
-            zipmap=False,
-        )
-
+        onx = convert_lightgbm(model, initial_types=initial_types, target_opset=15, zipmap=False)
     elif isinstance(model, HistGradientBoostingClassifier):
         initial_types = [("float_input", SklFloatTensorType([1, len(FEATURE_COLS)]))]
         options = {id(model): {"zipmap": False}}
-
         original_make_attribute, patched_make_attribute = _coerce_bool_attributes_for_onnx()
         onnx_helper.make_attribute = patched_make_attribute
         try:
-            onx = convert_sklearn(
-                model,
-                initial_types=initial_types,
-                options=options,
-                target_opset=15,
-            )
+            onx = convert_sklearn(model, initial_types=initial_types, options=options, target_opset=15)
         finally:
             onnx_helper.make_attribute = original_make_attribute
-
     else:
         initial_types = [("float_input", SklFloatTensorType([1, len(FEATURE_COLS)]))]
         options = {id(model): {"zipmap": False}}
-        onx = convert_sklearn(
-            model,
-            initial_types=initial_types,
-            options=options,
-            target_opset=15,
-        )
+        onx = convert_sklearn(model, initial_types=initial_types, options=options, target_opset=15)
 
     output_path.write_bytes(onx.SerializeToString())
 
-def save_metadata(output_dir: Path, args: argparse.Namespace, barrier: float, walk_forward: Dict[str, float],
+
+def save_metadata(output_dir: Path, args: argparse.Namespace, weights: Dict[str, float], barrier: float, walk_forward: Dict[str, float],
                   train_summary: Dict[str, float], test_summary: Dict[str, float], entry_prob_threshold: float,
                   min_prob_gap: float, train_start: str, train_end: str, test_start: str, test_end: str) -> None:
     meta = {
@@ -438,26 +442,31 @@ def save_metadata(output_dir: Path, args: argparse.Namespace, barrier: float, wa
         "label_quantile": args.label_quantile,
         "prob_quantile": args.prob_quantile,
         "margin_quantile": args.margin_quantile,
+        "weights_raw": {
+            "mlp": args.mlp_weight,
+            "lgbm": args.lgbm_weight,
+            "hgb": args.hgb_weight,
+        },
+        "weights_normalized": weights,
         "barrier_abs_fwd_ret_h": barrier,
         "entry_prob_threshold": entry_prob_threshold,
         "min_prob_gap": min_prob_gap,
         "features": FEATURE_COLS,
         "class_order": CLASS_ORDER,
         "class_encoding": {"sell": 0, "flat": 1, "buy": 2},
-        "model_type": "EnsembleAverage(MLP, LightGBM, HGB)",
+        "model_type": "WeightedEnsemble(MLP, LightGBM, HGB)",
         "train_window_utc": {"start": train_start, "end": train_end},
         "test_window_utc": {"start": test_start, "end": test_end},
         "walk_forward_train": walk_forward,
         "train_summary": train_summary,
         "test_summary": test_summary,
-        "component_models": ["mlp", "lightgbm", "hgb"],
     }
     (output_dir / "model_metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
-def write_run_in_mt5(output_dir: Path, args: argparse.Namespace, train_start: str, train_end: str, test_start: str, test_end: str,
+def write_run_in_mt5(output_dir: Path, args: argparse.Namespace, weights: Dict[str, float], train_start: str, train_end: str, test_start: str, test_end: str,
                      entry_prob_threshold: float, min_prob_gap: float) -> None:
-    txt = f"""MODEL: EnsembleAverage(MLP + LightGBM + HGB)
+    txt = f"""MODEL: WeightedEnsemble(MLP + LightGBM + HGB)
 SIMBOL: {args.symbol}
 TIMEFRAME: {args.timeframe}
 ORIZONT TARGET (bare): {args.horizon_bars}
@@ -470,42 +479,47 @@ TEST UTC:
   start: {test_start}
   end  : {test_end}
 
+WEIGHTS NORMALIZATE:
+  InpMlpWeight  = {weights['mlp']:.6f}
+  InpLgbmWeight = {weights['lgbm']:.6f}
+  InpHgbWeight  = {weights['hgb']:.6f}
+
 INPUTURI RECOMANDATE PENTRU EA:
   InpEntryProbThreshold = {entry_prob_threshold:.6f}
   InpMinProbGap        = {min_prob_gap:.6f}
   InpMaxBarsInTrade    = {args.horizon_bars}
 
-PASII:
-1. Copiaza fisierele:
-   - mlp.onnx
-   - lightgbm.onnx
-   - hgb.onnx
-   langa EA-ul .mq5.
-2. Recompileaza EA-ul in MetaEditor.
-3. Ruleaza Strategy Tester DOAR pe fereastra TEST UTC de mai sus.
-4. EA-ul face media probabilitatilor celor 3 modele.
+NOTA:
+- Daca pui InpMlpWeight=1 si restul 0, ensemble-ul devine practic MLP-only.
+- Daca pui InpLgbmWeight=1 si restul 0, devine LightGBM-only.
+- Daca pui InpHgbWeight=1 si restul 0, devine HGB-only.
 """
     (output_dir / "run_in_mt5.txt").write_text(txt, encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Antreneaza un ensemble MT5: MLP + LightGBM + HGB si exporta cele 3 modele ONNX.")
+    p = argparse.ArgumentParser(description="Antreneaza un ensemble cu weight-uri configurabile: MLP + LightGBM + HGB.")
     p.add_argument("--symbol", default="XAGUSD")
     p.add_argument("--timeframe", default="M15")
     p.add_argument("--bars", type=int, default=20000)
     p.add_argument("--csv", type=str, default="")
-    p.add_argument("--output-dir", default="output_ensemble")
+    p.add_argument("--output-dir", default="output_weighted_ensemble")
     p.add_argument("--horizon-bars", type=int, default=8)
     p.add_argument("--train-ratio", type=float, default=0.70)
     p.add_argument("--label-quantile", type=float, default=0.67)
     p.add_argument("--prob-quantile", type=float, default=0.80)
     p.add_argument("--margin-quantile", type=float, default=0.65)
     p.add_argument("--walk-forward-splits", type=int, default=5)
+    p.add_argument("--mlp-weight", type=float, default=1.0)
+    p.add_argument("--lgbm-weight", type=float, default=0.0)
+    p.add_argument("--hgb-weight", type=float, default=0.0)
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    weights = normalize_weights(args.mlp_weight, args.lgbm_weight, args.hgb_weight)
+
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -516,6 +530,8 @@ def main() -> None:
     feat_df.to_csv(output_dir / "all_features_snapshot.csv", index=False)
 
     print(f"Set total cu features: {len(feat_df)} randuri")
+    print(f"Weights normalizate: MLP={weights['mlp']:.4f} LGBM={weights['lgbm']:.4f} HGB={weights['hgb']:.4f}")
+
     train_df, test_df = split_train_test(feat_df, args.train_ratio)
     print(f"Train: {len(train_df)} randuri | Test: {len(test_df)} randuri")
     print(f"Train window: {train_df['time'].iloc[0]} -> {train_df['time'].iloc[-1]}")
@@ -523,11 +539,7 @@ def main() -> None:
     print()
 
     walk_forward = walk_forward_report(
-        train_df,
-        args.walk_forward_splits,
-        args.label_quantile,
-        args.prob_quantile,
-        args.margin_quantile,
+        train_df, weights, args.walk_forward_splits, args.label_quantile, args.prob_quantile, args.margin_quantile
     )
     print("\nRezumat walk-forward pe train:")
     print(json.dumps(walk_forward, indent=2))
@@ -537,12 +549,13 @@ def main() -> None:
     test_lab = label_targets(test_df, barrier)
 
     models = fit_models(train_lab, random_state=42)
+
     entry_prob_threshold, min_prob_gap, train_diag = derive_decision_thresholds(
-        models, train_lab, args.prob_quantile, args.margin_quantile
+        models, train_lab, weights, args.prob_quantile, args.margin_quantile
     )
 
-    train_pred = classify_with_thresholds(models, train_lab, entry_prob_threshold, min_prob_gap)
-    test_pred = classify_with_thresholds(models, test_lab, entry_prob_threshold, min_prob_gap)
+    train_pred = classify_with_thresholds(models, train_lab, weights, entry_prob_threshold, min_prob_gap)
+    test_pred = classify_with_thresholds(models, test_lab, weights, entry_prob_threshold, min_prob_gap)
 
     train_pred.to_csv(output_dir / "train_predictions_snapshot.csv", index=False)
     test_pred.to_csv(output_dir / "test_predictions_snapshot.csv", index=False)
@@ -560,19 +573,19 @@ def main() -> None:
     print("\nTest summary:")
     print(json.dumps(test_summary, indent=2))
 
-    export_model_to_onnx(models[0], output_dir / "mlp.onnx")
-    export_model_to_onnx(models[1], output_dir / "lightgbm.onnx")
-    export_model_to_onnx(models[2], output_dir / "hgb.onnx")
+    export_model_to_onnx(models["mlp"], output_dir / "mlp.onnx")
+    export_model_to_onnx(models["lgbm"], output_dir / "lightgbm.onnx")
+    export_model_to_onnx(models["hgb"], output_dir / "hgb.onnx")
 
     save_metadata(
-        output_dir, args, barrier, walk_forward, train_summary, test_summary,
+        output_dir, args, weights, barrier, walk_forward, train_summary, test_summary,
         entry_prob_threshold, min_prob_gap,
         str(train_df["time"].iloc[0]), str(train_df["time"].iloc[-1]),
         str(test_df["time"].iloc[0]), str(test_df["time"].iloc[-1]),
     )
 
     write_run_in_mt5(
-        output_dir, args,
+        output_dir, args, weights,
         str(train_df["time"].iloc[0]), str(train_df["time"].iloc[-1]),
         str(test_df["time"].iloc[0]), str(test_df["time"].iloc[-1]),
         entry_prob_threshold, min_prob_gap,
@@ -582,10 +595,6 @@ def main() -> None:
     print("  - mlp.onnx")
     print("  - lightgbm.onnx")
     print("  - hgb.onnx")
-    print(f"Foloseste in EA InpEntryProbThreshold = {entry_prob_threshold:.6f}")
-    print(f"Foloseste in EA InpMinProbGap        = {min_prob_gap:.6f}")
-    print(f"Foloseste in EA InpMaxBarsInTrade    = {args.horizon_bars}")
-    print("Citeste si fisierul run_in_mt5.txt din output pentru fereastra exacta de test.")
 
 
 if __name__ == "__main__":
