@@ -1,6 +1,6 @@
 # Weighted ML ensemble classifiers for MT5
 
-Collection of 3 best individual classifiers: MLP, LightGBM, HGB.
+Collection of 3 best individual classifiers (MLP, LightGBM, HGB) configured by giving weights to each one of their decisions to work together in classifying if the next X bars are buy, sell or flat.
 
 ## Files
 - `train_mt5_weighted_ensemble_classifier.py`
