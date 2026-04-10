@@ -98,7 +98,7 @@ bool NormalizeWeights()
    double b = MathMax(0.0, InpLgbmWeight);
    double c = MathMax(0.0, InpHgbWeight);
    double s = a + b + c;
-   if(s <= 0.0)
+   if (s <= 0.0)
       return false;
 
    g_w_mlp = a / s;
@@ -110,9 +110,9 @@ bool NormalizeWeights()
 bool IsNewBar()
 {
    datetime t = iTime(_Symbol,_Period,0);
-   if(t == 0) return false;
-   if(g_last_bar_time == 0){ g_last_bar_time = t; return false; }
-   if(t !=  g_last_bar_time){ g_last_bar_time = t; return true; }
+   if (t == 0) return false;
+   if (g_last_bar_time == 0){ g_last_bar_time = t; return false; }
+   if (t !=  g_last_bar_time){ g_last_bar_time = t; return true; }
    return false;
 }
 
@@ -145,9 +145,9 @@ double CalcATR(const MqlRates &rates[], int start_shift, int period)
 
 double GetPercentileFromArray(const double &arr[], int count, double q)
 {
-   if(count <= 0) return 0.0;
-   if(q <= 0.0) q = 0.0;
-   if(q >= 1.0) q = 1.0;
+   if (count <= 0) return 0.0;
+   if (q <= 0.0) q = 0.0;
+   if (q >= 1.0) q = 1.0;
 
    double tmp[];
    ArrayResize(tmp,count);
@@ -156,7 +156,7 @@ double GetPercentileFromArray(const double &arr[], int count, double q)
 
    double pos = q*(count-1);
    int lo = (int)MathFloor(pos), hi = (int)MathCeil(pos);
-   if(lo == hi) return tmp[lo];
+   if (lo == hi) return tmp[lo];
    double w = pos-lo;
    return tmp[lo]*(1.0-w) + tmp[hi]*w;
 }
@@ -164,7 +164,7 @@ double GetPercentileFromArray(const double &arr[], int count, double q)
 bool BuildFeatureVector(matrixf &features, double &atr14)
 {
    MqlRates rates[]; ArraySetAsSeries(rates,true);
-   if(CopyRates(_Symbol,_Period,0,80,rates) < 40) return false;
+   if (CopyRates(_Symbol,_Period,0,80,rates) < 40) return false;
 
    double closes[];
    ArrayResize(closes,ArraySize(rates));
@@ -185,12 +185,12 @@ bool BuildFeatureVector(matrixf &features, double &atr14)
    double vol_20 = StdDev(one_bar_returns,0,20);
 
    double sma_10 = Mean(closes,s,10), sma_20 = Mean(closes,s,20);
-   if(sma_10 == 0.0 || sma_20 == 0.0) return false;
+   if (sma_10 == 0.0 || sma_20 == 0.0) return false;
 
    double dist_sma_10 = (closes[s]/sma_10)-1.0;
    double dist_sma_20 = (closes[s]/sma_20)-1.0;
    double mean_20 = Mean(closes,s,20), std_20 = StdDev(closes,s,20), zscore_20 = 0.0;
-   if(std_20 > 0.0) zscore_20 = (closes[s]-mean_20)/std_20;
+   if (std_20 > 0.0) zscore_20 = (closes[s]-mean_20)/std_20;
 
    atr14 = CalcATR(rates,s,14);
 
@@ -211,10 +211,10 @@ bool BuildFeatureVector(matrixf &features, double &atr14)
 bool SetupHandle(long &handle, const uchar &buffer[])
 {
    handle = OnnxCreateFromBuffer(buffer, ONNX_DEFAULT);
-   if(handle == INVALID_HANDLE) return false;
-   if(!OnnxSetInputShape(handle,0,EXT_INPUT_SHAPE)) return false;
-   if(!OnnxSetOutputShape(handle,0,EXT_LABEL_SHAPE)) return false;
-   if(!OnnxSetOutputShape(handle,1,EXT_PROBA_SHAPE)) return false;
+   if (handle == INVALID_HANDLE) return false;
+   if (!OnnxSetInputShape(handle,0,EXT_INPUT_SHAPE)) return false;
+   if (!OnnxSetOutputShape(handle,0,EXT_LABEL_SHAPE)) return false;
+   if (!OnnxSetOutputShape(handle,1,EXT_PROBA_SHAPE)) return false;
    return true;
 }
 
@@ -224,7 +224,7 @@ bool RunOneModel(long handle, const matrixf &x, double &pSell, double &pFlat, do
    matrixf probs;
    probs.Resize(1,CLASS_COUNT);
 
-   if(!OnnxRun(handle,0,x,predicted_label,probs)) return false;
+   if (!OnnxRun(handle,0,x,predicted_label,probs)) return false;
 
    pSell = probs[0][0];
    pFlat = probs[0][1];
@@ -235,15 +235,15 @@ bool RunOneModel(long handle, const matrixf &x, double &pSell, double &pFlat, do
 bool PredictClassProbabilities(double &pSell, double &pFlat, double &pBuy, double &atr14)
 {
    matrixf x;
-   if(!BuildFeatureVector(x,atr14)) return false;
+   if (!BuildFeatureVector(x,atr14)) return false;
 
    double s1 = 0.0,f1 = 0.0,b1 = 0.0;
    double s2 = 0.0,f2 = 0.0,b2 = 0.0;
    double s3 = 0.0,f3 = 0.0,b3 = 0.0;
 
-   if(g_w_mlp > 0.0 && !RunOneModel(g_mlp_handle,x,s1,f1,b1)) return false;
-   if(g_w_lgbm > 0.0 && !RunOneModel(g_lgbm_handle,x,s2,f2,b2)) return false;
-   if(g_w_hgb > 0.0 && !RunOneModel(g_hgb_handle,x,s3,f3,b3)) return false;
+   if (g_w_mlp > 0.0 && !RunOneModel(g_mlp_handle,x,s1,f1,b1)) return false;
+   if (g_w_lgbm > 0.0 && !RunOneModel(g_lgbm_handle,x,s2,f2,b2)) return false;
+   if (g_w_hgb > 0.0 && !RunOneModel(g_hgb_handle,x,s3,f3,b3)) return false;
 
    pSell = g_w_mlp*s1 + g_w_lgbm*s2 + g_w_hgb*s3;
    pFlat = g_w_mlp*f1 + g_w_lgbm*f2 + g_w_hgb*f3;
@@ -256,13 +256,13 @@ SignalDirection SignalFromProbabilities(double pSell, double pFlat, double pBuy)
    double best = pFlat, second = -1.0;
    SignalDirection signal = SIGNAL_FLAT;
 
-   if(pBuy >= pSell && pBuy > best)
+   if (pBuy >= pSell && pBuy > best)
    {
       second = MathMax(best,pSell);
       best = pBuy;
       signal = SIGNAL_BUY;
    }
-   else if(pSell > pBuy && pSell > best)
+   else if (pSell > pBuy && pSell > best)
    {
       second = MathMax(best,pBuy);
       best = pSell;
@@ -276,17 +276,17 @@ SignalDirection SignalFromProbabilities(double pSell, double pFlat, double pBuy)
 
    double gap = best-second;
 
-   if(signal == SIGNAL_BUY)
+   if (signal == SIGNAL_BUY)
    {
-      if(!InpAllowLong) return SIGNAL_FLAT;
-      if(pBuy < InpEntryProbThreshold || gap < InpMinProbGap) return SIGNAL_FLAT;
+      if (!InpAllowLong) return SIGNAL_FLAT;
+      if (pBuy < InpEntryProbThreshold || gap < InpMinProbGap) return SIGNAL_FLAT;
       return SIGNAL_BUY;
    }
 
-   if(signal == SIGNAL_SELL)
+   if (signal == SIGNAL_SELL)
    {
-      if(!InpAllowShort) return SIGNAL_FLAT;
-      if(pSell < InpEntryProbThreshold || gap < InpMinProbGap) return SIGNAL_FLAT;
+      if (!InpAllowShort) return SIGNAL_FLAT;
+      if (pSell < InpEntryProbThreshold || gap < InpMinProbGap) return SIGNAL_FLAT;
       return SIGNAL_SELL;
    }
 
@@ -295,15 +295,15 @@ SignalDirection SignalFromProbabilities(double pSell, double pFlat, double pBuy)
 
 bool GetTrendFilterValues(double &htf_close_1, double &ema_1, double &ema_2)
 {
-   if(!InpUseTrendFilter) return true;
-   if(g_trend_ma_handle == INVALID_HANDLE) return false;
+   if (!InpUseTrendFilter) return true;
+   if (g_trend_ma_handle == INVALID_HANDLE) return false;
 
    htf_close_1 = iClose(_Symbol,InpTrendTF,1);
-   if(htf_close_1 == 0.0) return false;
+   if (htf_close_1 == 0.0) return false;
 
    double ema_buf[];
    ArraySetAsSeries(ema_buf,true);
-   if(CopyBuffer(g_trend_ma_handle,0,1,2,ema_buf) < 2) return false;
+   if (CopyBuffer(g_trend_ma_handle,0,1,2,ema_buf) < 2) return false;
 
    ema_1 = ema_buf[0];
    ema_2 = ema_buf[1];
@@ -320,14 +320,14 @@ bool GetDBBValues(
    double &lower_large
 )
 {
-   if(!InpUseDBBFilter)
+   if (!InpUseDBBFilter)
       return true;
    
-   if(g_dbb_small_handle == INVALID_HANDLE || g_dbb_large_handle == INVALID_HANDLE)
+   if (g_dbb_small_handle == INVALID_HANDLE || g_dbb_large_handle == INVALID_HANDLE)
       return false;
    
    close_1 = iClose(_Symbol, InpDBBTF, 1);
-   if(close_1 == 0.0)
+   if (close_1 == 0.0)
       return false;
    
    double upper_s[], mid_s[], lower_s[];
@@ -341,10 +341,10 @@ bool GetDBBValues(
    ArraySetAsSeries(mid_l,   true);
    ArraySetAsSeries(lower_l, true);
    
-   if(CopyBuffer(g_dbb_small_handle, 0, 1, 1, upper_s) < 1) return false; // upper
-   if(CopyBuffer(g_dbb_small_handle, 1, 1, 1, lower_s) < 1) return false; // lower
-   if(CopyBuffer(g_dbb_large_handle, 0, 1, 1, upper_l) < 1) return false;
-   if(CopyBuffer(g_dbb_large_handle, 1, 1, 1, lower_l) < 1) return false;
+   if (CopyBuffer(g_dbb_small_handle, 0, 1, 1, upper_s) < 1) return false; // upper
+   if (CopyBuffer(g_dbb_small_handle, 1, 1, 1, lower_s) < 1) return false; // lower
+   if (CopyBuffer(g_dbb_large_handle, 0, 1, 1, upper_l) < 1) return false;
+   if (CopyBuffer(g_dbb_large_handle, 1, 1, 1, lower_l) < 1) return false;
    
    upper_small = upper_s[0];
    lower_small = lower_s[0];
@@ -361,10 +361,10 @@ bool GetDBBValues(
 
 bool DBBAllows(SignalDirection signal)
 {
-   if(!InpUseDBBFilter)
+   if (!InpUseDBBFilter)
       return true;
 
-   if(signal == SIGNAL_FLAT)
+   if (signal == SIGNAL_FLAT)
       return true;
 
    double close_1 = 0.0;
@@ -375,14 +375,14 @@ bool DBBAllows(SignalDirection signal)
    double upper_large = 0.0;
    double lower_large = 0.0;
 
-   if(!GetDBBValues(close_1, mid_small, upper_small, lower_small, mid_large, upper_large, lower_large))
+   if (!GetDBBValues(close_1, mid_small, upper_small, lower_small, mid_large, upper_large, lower_large))
    {
-      if(InpLog)
+      if (InpLog)
          Print("DBB filter: nu pot citi valorile.");
       return false;
    }
 
-   if(InpDebugLog && InpLog)
+   if (InpDebugLog && InpLog)
    {
       PrintFormat(
          "DBB close = %.5f mid = %.5f us = %.5f ls = %.5f ul = %.5f ll = %.5f mode = %d",
@@ -390,27 +390,27 @@ bool DBBAllows(SignalDirection signal)
       );
    }
 
-   if(signal == SIGNAL_BUY)
+   if (signal == SIGNAL_BUY)
    {
-      if(InpDBBMode == DBB_STRICT)
+      if (InpDBBMode == DBB_STRICT)
          return (close_1 > upper_small);
 
-      if(InpDBBMode == DBB_MID)
+      if (InpDBBMode == DBB_MID)
          return (close_1 > mid_small);
 
-      if(InpDBBMode == DBB_OUTER)
+      if (InpDBBMode == DBB_OUTER)
          return (close_1 > upper_large);
    }
 
-   if(signal == SIGNAL_SELL)
+   if (signal == SIGNAL_SELL)
    {
-      if(InpDBBMode == DBB_STRICT)
+      if (InpDBBMode == DBB_STRICT)
          return (close_1 < lower_small);
 
-      if(InpDBBMode == DBB_MID)
+      if (InpDBBMode == DBB_MID)
          return (close_1 < mid_small);
 
-      if(InpDBBMode == DBB_OUTER)
+      if (InpDBBMode == DBB_OUTER)
          return (close_1 < lower_large);
    }
 
@@ -419,34 +419,34 @@ bool DBBAllows(SignalDirection signal)
 
 bool TrendAllows(SignalDirection signal)
 {
-   if(!InpUseTrendFilter || signal == SIGNAL_FLAT) return true;
+   if (!InpUseTrendFilter || signal == SIGNAL_FLAT) return true;
 
    double htf_close_1 = 0.0, ema_1 = 0.0, ema_2 = 0.0;
-   if(!GetTrendFilterValues(htf_close_1,ema_1,ema_2)) return false;
+   if (!GetTrendFilterValues(htf_close_1,ema_1,ema_2)) return false;
 
    bool slope_up = (ema_1 > ema_2), slope_down = (ema_1 < ema_2);
    double distance_pct = 0.0;
-   if(ema_1 !=  0.0) distance_pct = MathAbs(htf_close_1 - ema_1)/ema_1;
+   if (ema_1 !=  0.0) distance_pct = MathAbs(htf_close_1 - ema_1)/ema_1;
 
-   if(InpDebugLog && InpLog)
+   if (InpDebugLog && InpLog)
       PrintFormat(
          "TREND htf_close = %.5f ema1 = %.5f ema2 = %.5f slope_up = %d slope_down = %d distance_pct = %.6f",
          htf_close_1, ema_1, ema_2, slope_up, slope_down, distance_pct
       );
 
-   if(InpUseTrendDistanceFilter && distance_pct < InpTrendMinDistancePct) return false;
+   if (InpUseTrendDistanceFilter && distance_pct < InpTrendMinDistancePct) return false;
 
-   if(signal == SIGNAL_BUY)
+   if (signal == SIGNAL_BUY)
    {
-      if(htf_close_1 <= ema_1) return false;
-      if(InpTrendRequireSlope && !slope_up) return false;
+      if (htf_close_1 <= ema_1) return false;
+      if (InpTrendRequireSlope && !slope_up) return false;
       return true;
    }
 
-   if(signal == SIGNAL_SELL)
+   if (signal == SIGNAL_SELL)
    {
-      if(htf_close_1 >= ema_1) return false;
-      if(InpTrendRequireSlope && !slope_down) return false;
+      if (htf_close_1 >= ema_1) return false;
+      if (InpTrendRequireSlope && !slope_down) return false;
       return true;
    }
 
@@ -455,13 +455,13 @@ bool TrendAllows(SignalDirection signal)
 
 bool AtrVolatilityAllows(double current_atr14)
 {
-   if(!InpUseAtrVolFilter) return true;
+   if (!InpUseAtrVolFilter) return true;
 
    MqlRates rates[];
    ArraySetAsSeries(rates,true);
 
    int need_bars = InpAtrVolLookback + 20;
-   if(CopyRates(_Symbol,_Period,0,need_bars,rates) < need_bars) return false;
+   if (CopyRates(_Symbol,_Period,0,need_bars,rates) < need_bars) return false;
 
    double atr_values[];
    ArrayResize(atr_values,InpAtrVolLookback);
@@ -472,17 +472,17 @@ bool AtrVolatilityAllows(double current_atr14)
    double atr_min = GetPercentileFromArray(atr_values,InpAtrVolLookback,InpAtrMinPercentile);
    double atr_max = GetPercentileFromArray(atr_values,InpAtrVolLookback,InpAtrMaxPercentile);
 
-   if(InpDebugLog && InpLog)
+   if (InpDebugLog && InpLog)
       PrintFormat("ATR FILTER current = %.6f min = %.6f max = %.6f", current_atr14, atr_min, atr_max);
 
-   if(current_atr14 < atr_min || current_atr14 > atr_max) return false;
+   if (current_atr14 < atr_min || current_atr14 > atr_max) return false;
    return true;
 }
 
 bool HasOpenPosition(long &pos_type, double &pos_price)
 {
-   if(!PositionSelect(_Symbol)) return false;
-   if((long)PositionGetInteger(POSITION_MAGIC) != InpMagic) return false;
+   if (!PositionSelect(_Symbol)) return false;
+   if ((long)PositionGetInteger(POSITION_MAGIC) != InpMagic) return false;
 
    pos_type = (long)PositionGetInteger(POSITION_TYPE);
    pos_price = PositionGetDouble(POSITION_PRICE_OPEN);
@@ -491,7 +491,7 @@ bool HasOpenPosition(long &pos_type, double &pos_price)
 
 void CloseOpenPosition()
 {
-   if(PositionSelect(_Symbol) && (long)PositionGetInteger(POSITION_MAGIC) == InpMagic)
+   if (PositionSelect(_Symbol) && (long)PositionGetInteger(POSITION_MAGIC) == InpMagic)
       trade.PositionClose(_Symbol);
 }
 
@@ -501,7 +501,7 @@ void PushClosedTradeProfit(double value)
    ArrayResize(g_recent_closed_profits,size + 1);
    g_recent_closed_profits[size] = value;
 
-   if(ArraySize(g_recent_closed_profits) > InpKillSwitchLookbackTrades)
+   if (ArraySize(g_recent_closed_profits) > InpKillSwitchLookbackTrades)
    {
       for(int i = 1;i < ArraySize(g_recent_closed_profits);i++)
          g_recent_closed_profits[i-1] = g_recent_closed_profits[i];
@@ -511,17 +511,17 @@ void PushClosedTradeProfit(double value)
 
 void ActivateKillSwitch(string reason)
 {
-   if(!InpUseKillSwitch) return;
+   if (!InpUseKillSwitch) return;
    g_kill_switch_active = true;
    g_kill_switch_pause_remaining = InpKillSwitchPauseBars;
-   if(InpKillSwitchFlatOnActivate) CloseOpenPosition();
+   if (InpKillSwitchFlatOnActivate) CloseOpenPosition();
 }
 
 void DecrementKillSwitchPause()
 {
-   if(!g_kill_switch_active) return;
-   if(g_kill_switch_pause_remaining > 0) g_kill_switch_pause_remaining--;
-   if(g_kill_switch_pause_remaining <= 0)
+   if (!g_kill_switch_active) return;
+   if (g_kill_switch_pause_remaining > 0) g_kill_switch_pause_remaining--;
+   if (g_kill_switch_pause_remaining <= 0)
    {
       g_kill_switch_active = false;
       g_consecutive_losses = 0;
@@ -531,16 +531,16 @@ void DecrementKillSwitchPause()
 
 void EvaluateKillSwitch()
 {
-   if(!InpUseKillSwitch || g_kill_switch_active) return;
+   if (!InpUseKillSwitch || g_kill_switch_active) return;
 
-   if(g_consecutive_losses >= InpKillSwitchConsecutiveLosses)
+   if (g_consecutive_losses >= InpKillSwitchConsecutiveLosses)
    {
       ActivateKillSwitch("");
       return;
    }
 
    int n = ArraySize(g_recent_closed_profits);
-   if(n < InpKillSwitchLookbackTrades) return;
+   if (n < InpKillSwitchLookbackTrades) return;
 
    int wins = 0;
    double gross_profit = 0.0, gross_loss_abs = 0.0;
@@ -548,35 +548,35 @@ void EvaluateKillSwitch()
    for(int i = 0;i < n;i++)
    {
       double p = g_recent_closed_profits[i];
-      if(p > 0.0){ wins++; gross_profit += p; }
-      else if(p < 0.0){ gross_loss_abs += MathAbs(p); }
+      if (p > 0.0){ wins++; gross_profit += p; }
+      else if (p < 0.0){ gross_loss_abs += MathAbs(p); }
    }
 
    double win_rate = (double)wins/(double)n;
    double profit_factor = (gross_loss_abs > 0.0 ? gross_profit/gross_loss_abs : 999.0);
 
-   if(win_rate < InpKillSwitchMinWinRate){ ActivateKillSwitch(""); return; }
-   if(profit_factor < InpKillSwitchMinProfitFactor){ ActivateKillSwitch(""); return; }
+   if (win_rate < InpKillSwitchMinWinRate){ ActivateKillSwitch(""); return; }
+   if (profit_factor < InpKillSwitchMinProfitFactor){ ActivateKillSwitch(""); return; }
 }
 
 void UpdateClosedTradeStats()
 {
-   if(!InpUseKillSwitch) return;
-   if(!HistorySelect(0,TimeCurrent())) return;
+   if (!InpUseKillSwitch) return;
+   if (!HistorySelect(0,TimeCurrent())) return;
 
    int total = HistoryDealsTotal();
-   if(total <= g_last_history_deals_total) return;
+   if (total <= g_last_history_deals_total) return;
 
    for(int i = g_last_history_deals_total;i < total;i++)
    {
       ulong deal_ticket = HistoryDealGetTicket(i);
-      if(deal_ticket == 0) continue;
+      if (deal_ticket == 0) continue;
 
       string symbol = HistoryDealGetString(deal_ticket,DEAL_SYMBOL);
       long magic = HistoryDealGetInteger(deal_ticket,DEAL_MAGIC);
       long entry = HistoryDealGetInteger(deal_ticket,DEAL_ENTRY);
 
-      if(symbol !=  _Symbol || magic !=  InpMagic || entry !=  DEAL_ENTRY_OUT) continue;
+      if (symbol !=  _Symbol || magic !=  InpMagic || entry !=  DEAL_ENTRY_OUT) continue;
 
       double profit = HistoryDealGetDouble(deal_ticket,DEAL_PROFIT);
       double swap = HistoryDealGetDouble(deal_ticket,DEAL_SWAP);
@@ -585,8 +585,8 @@ void UpdateClosedTradeStats()
 
       PushClosedTradeProfit(net);
 
-      if(net < 0.0) g_consecutive_losses++;
-      else if(net > 0.0) g_consecutive_losses = 0;
+      if (net < 0.0) g_consecutive_losses++;
+      else if (net > 0.0) g_consecutive_losses = 0;
    }
 
    g_last_history_deals_total = total;
@@ -608,21 +608,21 @@ void OpenTrade(SignalDirection signal, double atr14)
    trade.SetDeviationInPoints(20);
 
    bool ok = false;
-   if(signal == SIGNAL_BUY)
+   if (signal == SIGNAL_BUY)
    {
-      if(InpUseAtrStops){ sl = ask-sl_dist; tp = ask + tp_dist; }
+      if (InpUseAtrStops){ sl = ask-sl_dist; tp = ask + tp_dist; }
       ok = trade.Buy(InpLots,_Symbol,ask,sl,tp,"Weighted Ensemble buy");
-      if(ok) { g_bars_in_trade = 0; if(InpLog) Print("Buy succeeded."); }
-      else if(InpLog)
+      if (ok) { g_bars_in_trade = 0; if (InpLog) Print("Buy succeeded."); }
+      else if (InpLog)
          PrintFormat("BUY failed. retcode = %d lastError = %d ask = %.5f sl = %.5f tp = %.5f",
                      trade.ResultRetcode(), GetLastError(), ask, sl, tp);
    }
-   else if(signal == SIGNAL_SELL)
+   else if (signal == SIGNAL_SELL)
    {
-      if(InpUseAtrStops){ sl = bid + sl_dist; tp = bid-tp_dist; }
+      if (InpUseAtrStops){ sl = bid + sl_dist; tp = bid-tp_dist; }
       ok = trade.Sell(InpLots,_Symbol,bid,sl,tp,"Weighted Ensemble sell");
-      if(ok) { g_bars_in_trade = 0; if(InpLog) Print("Sell succeeded."); }
-      else if(InpLog)
+      if (ok) { g_bars_in_trade = 0; if (InpLog) Print("Sell succeeded."); }
+      else if (InpLog)
          PrintFormat("SELL failed. retcode = %d lastError = %d bid = %.5f sl = %.5f tp = %.5f",
                      trade.ResultRetcode(), GetLastError(), bid, sl, tp);
    }
@@ -632,65 +632,65 @@ void ManageExistingPosition(SignalDirection signal)
 {
    long pos_type;
    double pos_price;
-   if(!HasOpenPosition(pos_type,pos_price)) return;
+   if (!HasOpenPosition(pos_type,pos_price)) return;
 
    g_bars_in_trade++;
    bool should_close = false;
 
-   if(InpCloseOnOppositeSignal)
+   if (InpCloseOnOppositeSignal)
    {
-      if(pos_type == POSITION_TYPE_BUY && signal == SIGNAL_SELL) should_close = true;
-      if(pos_type == POSITION_TYPE_SELL && signal == SIGNAL_BUY) should_close = true;
+      if (pos_type == POSITION_TYPE_BUY && signal == SIGNAL_SELL) should_close = true;
+      if (pos_type == POSITION_TYPE_SELL && signal == SIGNAL_BUY) should_close = true;
    }
 
-   if(!should_close && g_bars_in_trade >= InpMaxBarsInTrade)
+   if (!should_close && g_bars_in_trade >= InpMaxBarsInTrade)
       should_close = true;
 
-   if(should_close) CloseOpenPosition();
+   if (should_close) CloseOpenPosition();
 }
 
 int OnInit()
 {
    trade.SetExpertMagicNumber(InpMagic);
 
-   if(!NormalizeWeights())
+   if (!NormalizeWeights())
       return INIT_PARAMETERS_INCORRECT;
 
-   if(g_w_mlp > 0.0 && !SetupHandle(g_mlp_handle,ExtModelMLP)) return INIT_FAILED;
-   if(g_w_lgbm > 0.0 && !SetupHandle(g_lgbm_handle,ExtModelLGBM)) return INIT_FAILED;
-   if(g_w_hgb > 0.0 && !SetupHandle(g_hgb_handle,ExtModelHGB)) return INIT_FAILED;
+   if (g_w_mlp > 0.0 && !SetupHandle(g_mlp_handle,ExtModelMLP)) return INIT_FAILED;
+   if (g_w_lgbm > 0.0 && !SetupHandle(g_lgbm_handle,ExtModelLGBM)) return INIT_FAILED;
+   if (g_w_hgb > 0.0 && !SetupHandle(g_hgb_handle,ExtModelHGB)) return INIT_FAILED;
 
-   if(InpUseDBBFilter)
+   if (InpUseDBBFilter)
    {
       g_dbb_small_handle = iBands(_Symbol, InpDBBTF, InpDBBPeriod, 0, InpDBBSmallDeviation, PRICE_CLOSE);
-      if(g_dbb_small_handle == INVALID_HANDLE)
+      if (g_dbb_small_handle == INVALID_HANDLE)
       {
-         if(InpLog)
+         if (InpLog)
             Print("DBB small iBands handle failed. Error = ", GetLastError());
          return INIT_FAILED;
       }
 
       g_dbb_large_handle = iBands(_Symbol, InpDBBTF, InpDBBPeriod, 0, InpDBBLargeDeviation, PRICE_CLOSE);
-      if(g_dbb_large_handle == INVALID_HANDLE)
+      if (g_dbb_large_handle == INVALID_HANDLE)
       {
-         if(InpLog)
+         if (InpLog)
             Print("DBB large iBands handle failed. Error = ", GetLastError());
          return INIT_FAILED;
       }
    }
 
-   if(InpUseTrendFilter)
+   if (InpUseTrendFilter)
    {
       g_trend_ma_handle = iMA(_Symbol,InpTrendTF,InpTrendMAPeriod,0,MODE_EMA,PRICE_CLOSE);
-      if(g_trend_ma_handle == INVALID_HANDLE)
+      if (g_trend_ma_handle == INVALID_HANDLE)
       {
-         if(InpLog)
+         if (InpLog)
             Print("Trend filter iMA handle failed. Error = ", GetLastError());
          return INIT_FAILED;
       }
    }
 
-   if(HistorySelect(0,TimeCurrent()))
+   if (HistorySelect(0,TimeCurrent()))
       g_last_history_deals_total = HistoryDealsTotal();
    else
       g_last_history_deals_total = 0;
@@ -705,16 +705,16 @@ int OnInit()
 
 void OnDeinit(const int reason)
 {
-   if(g_mlp_handle != INVALID_HANDLE) OnnxRelease(g_mlp_handle);
-   if(g_lgbm_handle != INVALID_HANDLE) OnnxRelease(g_lgbm_handle);
-   if(g_hgb_handle != INVALID_HANDLE) OnnxRelease(g_hgb_handle);
-   if(g_trend_ma_handle != INVALID_HANDLE) IndicatorRelease(g_trend_ma_handle);
-   if(g_dbb_small_handle != INVALID_HANDLE)
+   if (g_mlp_handle != INVALID_HANDLE) OnnxRelease(g_mlp_handle);
+   if (g_lgbm_handle != INVALID_HANDLE) OnnxRelease(g_lgbm_handle);
+   if (g_hgb_handle != INVALID_HANDLE) OnnxRelease(g_hgb_handle);
+   if (g_trend_ma_handle != INVALID_HANDLE) IndicatorRelease(g_trend_ma_handle);
+   if (g_dbb_small_handle != INVALID_HANDLE)
    {
       IndicatorRelease(g_dbb_small_handle);
       g_dbb_small_handle = INVALID_HANDLE;
    }
-   if(g_dbb_large_handle != INVALID_HANDLE)
+   if (g_dbb_large_handle != INVALID_HANDLE)
    {
       IndicatorRelease(g_dbb_large_handle);
       g_dbb_large_handle = INVALID_HANDLE;
@@ -723,16 +723,16 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
-   if(!IsNewBar()) return;
+   if (!IsNewBar()) return;
 
    UpdateClosedTradeStats();
    DecrementKillSwitchPause();
-   if(g_kill_switch_active) return;
+   if (g_kill_switch_active) return;
 
    double pSell = 0.0, pFlat = 0.0, pBuy = 0.0, atr14 = 0.0;
-   if(!PredictClassProbabilities(pSell,pFlat,pBuy,atr14)) return;
+   if (!PredictClassProbabilities(pSell,pFlat,pBuy,atr14)) return;
 
-   if(!AtrVolatilityAllows(atr14))
+   if (!AtrVolatilityAllows(atr14))
    {
       ManageExistingPosition(SIGNAL_FLAT);
       return;
@@ -741,13 +741,13 @@ void OnTick()
    SignalDirection raw_signal = SignalFromProbabilities(pSell,pFlat,pBuy);
    SignalDirection filtered_signal = raw_signal;
 
-   if(filtered_signal != SIGNAL_FLAT && !DBBAllows(filtered_signal))
+   if (filtered_signal != SIGNAL_FLAT && !DBBAllows(filtered_signal))
       filtered_signal = SIGNAL_FLAT;
    
-   if(!TrendAllows(raw_signal))
+   if (!TrendAllows(raw_signal))
       filtered_signal = SIGNAL_FLAT;
 
-   if(InpDebugLog && InpLog)
+   if (InpDebugLog && InpLog)
      {
       PrintFormat(
          "Probabilities sell = %.4f flat = %.4f buy = %.4f entry_prob = %.4f min_gap = %.4f raw_signal = %d filtered_signal = %d atr14 = %.5f",
@@ -759,8 +759,42 @@ void OnTick()
 
    long pos_type;
    double pos_price;
-   if(HasOpenPosition(pos_type,pos_price)) return;
+   if (HasOpenPosition(pos_type,pos_price)) return;
 
-   if(filtered_signal == SIGNAL_BUY || filtered_signal == SIGNAL_SELL)
+   if (filtered_signal == SIGNAL_BUY || filtered_signal == SIGNAL_SELL)
       OpenTrade(filtered_signal,atr14);
+}
+
+double OnTester()
+{
+   double profit = TesterStatistics(STAT_PROFIT);
+   double drawdown = TesterStatistics(STAT_EQUITY_DDREL_PERCENT);
+   double pf = TesterStatistics(STAT_PROFIT_FACTOR);
+
+   double score = profit * pf / (1.0 + drawdown);
+
+   return score;
+}
+
+void OnTesterDeinit()
+{
+   int handle = FileOpen("results.csv", FILE_WRITE | FILE_READ | FILE_CSV | FILE_SHARE_WRITE);
+
+   if (handle != INVALID_HANDLE)
+   {
+      FileSeek(handle, 0, SEEK_END);
+
+      FileWrite(
+         handle,
+         InpMlpWeight,
+         InpLgbmWeight,
+         InpHgbWeight,
+         TesterStatistics(STAT_PROFIT),
+         TesterStatistics(STAT_PROFIT_FACTOR),
+         TesterStatistics(STAT_EQUITY_DDREL_PERCENT),
+         TesterStatistics(STAT_TRADES)
+      );
+
+      FileClose(handle);
+   }
 }
