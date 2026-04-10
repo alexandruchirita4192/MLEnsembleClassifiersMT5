@@ -10,26 +10,26 @@
 #resource "hgb.onnx" as uchar ExtModelHGB[]
 
 input double InpLots                  = 0.10;
-input double InpEntryProbThreshold    = 0.60;
-input double InpMinProbGap            = 0.15;
+input double InpEntryProbThreshold    = 0.50;
+input double InpMinProbGap            = 0.10;
 input bool   InpUseAtrStops           = true;
-input double InpStopAtrMultiple       = 1.50;
-input double InpTakeAtrMultiple       = 2.00;
+input double InpStopAtrMultiple       = 1.00;
+input double InpTakeAtrMultiple       = 2.75;
 input int    InpMaxBarsInTrade        = 8;
 input bool   InpCloseOnOppositeSignal = true;
 input bool   InpAllowLong             = true;
 input bool   InpAllowShort            = true;
 
-input double InpMlpWeight             = 1.00;
-input double InpLgbmWeight            = 0.00;
-input double InpHgbWeight             = 0.00;
+input double InpMlpWeight             = 0.25;
+input double InpLgbmWeight            = 0.25;
+input double InpHgbWeight             = 0.50;
 
-input bool   InpUseTrendFilter        = true;
+input bool   InpUseTrendFilter        = false;
 input ENUM_TIMEFRAMES InpTrendTF      = PERIOD_H1;
 input int    InpTrendMAPeriod         = 100;
 input bool   InpTrendRequireSlope     = true;
 
-input bool   InpUseDBBFilter          = true;        // InpUseDBBFilter: Activate Double Bollinger Bands filter
+input bool   InpUseDBBFilter          = false;        // InpUseDBBFilter: Activate Double Bollinger Bands filter
 input ENUM_TIMEFRAMES InpDBBTF        = PERIOD_M15;  // InpDBBTF: Timeframe for DBB
 input int    InpDBBPeriod             = 20;          // InpDBBPeriod: Period Bollinger
 input double InpDBBSmallDeviation     = 1.0;         // InpDBBSmallDeviation: Small deviation
@@ -47,7 +47,7 @@ input DBBFilterMode InpDBBMode        = DBB_STRICT;  // DBBFilterMode: Filter mo
 input bool   InpUseTrendDistanceFilter = false;
 input double InpTrendMinDistancePct    = 0.0010;
 
-input bool   InpUseAtrVolFilter        = true;
+input bool   InpUseAtrVolFilter        = false;
 input int    InpAtrVolLookback         = 50;
 input double InpAtrMinPercentile       = 0.25;
 input double InpAtrMaxPercentile       = 0.85;
