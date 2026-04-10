@@ -1,5 +1,7 @@
 # Weighted ML ensemble classifiers for MT5
 
+Collection of 3 best individual classifiers: MLP, LightGBM, HGB.
+
 ## Files
 - `train_mt5_weighted_ensemble_classifier.py`
 - `MT5_Weighted_Ensemble_ONNX_Strategy.mq5`
