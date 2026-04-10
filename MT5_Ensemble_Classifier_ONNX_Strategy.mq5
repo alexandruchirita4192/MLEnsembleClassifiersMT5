@@ -767,34 +767,24 @@ void OnTick()
 
 double OnTester()
 {
-   double profit = TesterStatistics(STAT_PROFIT);
-   double drawdown = TesterStatistics(STAT_EQUITY_DDREL_PERCENT);
-   double pf = TesterStatistics(STAT_PROFIT_FACTOR);
+   double profit        = TesterStatistics(STAT_PROFIT);
+   double pf            = TesterStatistics(STAT_PROFIT_FACTOR);
+   double recovery      = TesterStatistics(STAT_RECOVERY_FACTOR);
+   double dd_percent    = TesterStatistics(STAT_EQUITY_DDREL_PERCENT);
+   double trades        = TesterStatistics(STAT_TRADES);
 
-   double score = profit * pf / (1.0 + drawdown);
+   // Penalty if there are too few transactions
+   double trade_penalty = 1.0;
+   if(trades < 20)
+      trade_penalty = 0.25;
+   else if(trades < 50)
+      trade_penalty = 0.60;
+
+   // Robust score, not only brut profit
+   double score = 0.0;
+
+   if(dd_percent >= 0.0)
+      score = (profit * MathMax(pf, 0.01) * MathMax(recovery, 0.01) * trade_penalty) / (1.0 + dd_percent);
 
    return score;
-}
-
-void OnTesterDeinit()
-{
-   int handle = FileOpen("results.csv", FILE_WRITE | FILE_READ | FILE_CSV | FILE_SHARE_WRITE);
-
-   if (handle != INVALID_HANDLE)
-   {
-      FileSeek(handle, 0, SEEK_END);
-
-      FileWrite(
-         handle,
-         InpMlpWeight,
-         InpLgbmWeight,
-         InpHgbWeight,
-         TesterStatistics(STAT_PROFIT),
-         TesterStatistics(STAT_PROFIT_FACTOR),
-         TesterStatistics(STAT_EQUITY_DDREL_PERCENT),
-         TesterStatistics(STAT_TRADES)
-      );
-
-      FileClose(handle);
-   }
 }
