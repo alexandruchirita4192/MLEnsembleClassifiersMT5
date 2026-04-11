@@ -1,4 +1,4 @@
-![ML Ensemble Classifiers](logo.png "ML Ensemble Classifiers Logo")
+<img src=logo.png width="300" height="300" alt="ML Ensemble Classifiers Logo"/>
 
 # Weighted ML ensemble classifiers for MT5
 
