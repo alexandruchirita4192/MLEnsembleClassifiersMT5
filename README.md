@@ -21,7 +21,7 @@ Examples:
 - `MLP only`: `--mlp-weight 1 --lgbm-weight 0 --hgb-weight 0`
 - `LightGBM only`: `--mlp-weight 0 --lgbm-weight 1 --hgb-weight 0`
 - `HGB only`: `--mlp-weight 0 --lgbm-weight 0 --hgb-weight 1`
-- `Weighted`: `--mlp-weight 0.6 --lgbm-weight 0.25 --hgb-weight 0.15`
+- `Weighted`: `--mlp-weight 0.25 --lgbm-weight 0.25 --hgb-weight 0.50`
 
 The script automatically normalizes the weights.
 
