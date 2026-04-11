@@ -2,6 +2,8 @@
 
 Collection of 3 best individual classifiers (MLP, LightGBM, HGB) configured by giving weights to each one of their decisions to work together in classifying if the next X bars are buy, sell or flat.
 
+MLP has been ranked first between individual classifiers on the data I have tested, followed by LightGBM and HistGradientBoosting. On other data, an weighted ensemble of MLP 0.25, LightGBM 0.25, 0.50 HistGradientBoosting was better than MLP, LightGBM or HistGradientBoosting individually.
+
 ## Files
 - `train_mt5_weighted_ensemble_classifier.py`
 - `MT5_Weighted_Ensemble_ONNX_Strategy.mq5`
