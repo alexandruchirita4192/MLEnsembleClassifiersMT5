@@ -1,6 +1,10 @@
+<img src=logo.png width="300" height="300" alt="ML Ensemble Classifiers Logo"/>
+
 # Weighted ML ensemble classifiers for MT5
 
 Collection of 3 best individual classifiers (MLP, LightGBM, HGB) configured by giving weights to each one of their decisions to work together in classifying if the next X bars are buy, sell or flat.
+
+MLP has been ranked first between individual classifiers on the data I have tested, followed by LightGBM and HistGradientBoosting. On other data, an weighted ensemble of MLP 0.25, LightGBM 0.25, 0.50 HistGradientBoosting was better than MLP, LightGBM or HistGradientBoosting individually.
 
 ## Files
 - `train_mt5_weighted_ensemble_classifier.py`
@@ -17,7 +21,7 @@ Examples:
 - `MLP only`: `--mlp-weight 1 --lgbm-weight 0 --hgb-weight 0`
 - `LightGBM only`: `--mlp-weight 0 --lgbm-weight 1 --hgb-weight 0`
 - `HGB only`: `--mlp-weight 0 --lgbm-weight 0 --hgb-weight 1`
-- `Weighted`: `--mlp-weight 0.6 --lgbm-weight 0.25 --hgb-weight 0.15`
+- `Weighted`: `--mlp-weight 0.25 --lgbm-weight 0.25 --hgb-weight 0.50`
 
 The script automatically normalizes the weights.
 
