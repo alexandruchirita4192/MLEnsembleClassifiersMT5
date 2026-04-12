@@ -644,6 +644,14 @@ SYMBOL: {args.symbol}
 TIMEFRAME: {args.timeframe}
 HORIZON TARGET (bars): {args.horizon_bars}
 
+TRAIN UTC:
+  start: {train_df["time"].iloc[0]}
+  end  : {train_df["time"].iloc[-1]}
+
+TEST UTC:
+  start: {test_df["time"].iloc[0]}
+  end  : {test_df["time"].iloc[-1]}
+
 BEST WEIGHTS:
   InpMlpWeight  = {best_avg_weights['mlp']:.6f}
   InpLgbmWeight = {best_avg_weights['lgbm']:.6f}
